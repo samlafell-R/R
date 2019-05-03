@@ -1,0 +1,74 @@
+# 4.1 Coding Basics
+
+R as a calculator...
+```{r}
+200 * 30
+(59 + 73 + 2)/3
+sin(pi/2)
+```
+
+Creating objects with <-:
+```{r}
+x <- 3 * 4
+```
+
+# 4.2 What's in a Name?
+Best to use Snake Case
+```{r}
+# this_is_snake_case
+# thisIsCamelCase
+```
+
+Naming and Renaming...
+```{r}
+this_is_a_really_long_name <- 2.5
+```
+
+To inspect this, we can use RStudio's completion facility... Type "this" then tab and return
+```{r}
+this_is_a_really_long_name
+```
+
+# 4.3 Calling Functions
+
+R has a large collection of functions called like...
+```{r}
+# function_name(arg1 = val1, arg2 = val2, ...)
+```
+
+Seq() makes regular sequences of numbers.
+```{r}
+seq(1, 10)
+```
+
+How to do assignment and Print to screen all at once...
+```{r}
+y <- seq(1, 10, length.out = 5)
+y
+(y <- seq(1, 10, length.out = 5))
+```
+The parenthesis surrounding the assignment makes print to screen happen.
+
+# 4.4 Practice
+## 1.
+```{r}
+my_variable <- 10
+# my_varıable
+```
+The variable that we attempted to call, the i is replaced by a 1 so it doesn't exist
+
+## 2. Tweak each of the following r commands so that they run correctly:
+```{r}
+library(tidyverse)
+ggplot(data = mpg) + 
+  geom_point(mapping = aes(x = displ, y = hwy))
+# fliter(mpg, cyl = 8)
+# filter(diamond, carat > 3)
+```
+
+In the code above, the first instance of "filter" is spelled incorrectly.
+
+## 3. Press Alt+Shift+K, what happens? How can you get to the same place using the menus?
+
+This brings up the keyboard shortcut quick reference.
+We get to the same place via "Help -- Keyboard Shortcuts Help"
