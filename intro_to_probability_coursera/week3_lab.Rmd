@@ -1,0 +1,151 @@
+---
+title: "week_3_work"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+## Getting Started
+
+First, we start with...
+```{r}
+View(kobe_basket)
+```
+
+kobe_basket has 133 observations and 6 variables.
+The "shot" variable has H or M for hit or miss.
+
+1. Fill in the blank: A streak of length 1 means one __ followed by one miss.
+A: hit
+2. Fill in the blank: A streak length of 0 means one __ which must occur after a miss that ended the preceeding streak.
+A: miss
+
+We can use calc_streak() to calculate the longest streaks in the shot column.
+```{r}
+kobe_streak <- calc_streak(kobe_basket$shot)
+table(kobe_streak)
+```
+
+```{r}
+ggplot(data = kobe_streak, aes(x = length)) +
+  geom_histogram(binwidth=1)
+```
+
+3.  Which of the following is false about the distribution of Kobe's streak lengths 
+from the 2009 NBA finals. 
+<ol>
+<li> The distribution of Kobe's streaks is unimodal and right skewed. </li>
+<li> The typical length of a streak is 0 since the median of the distribution is at 0. </li>
+<li> The IQR of the distribution is 1. 
+<li> The longest streak of baskets is of length 4. </li>
+<li> The shortest streak is of length 1.</li>
+</ol>
+
+A: 5. The shortest streak is of length 1.
+
+## Compared to What?
+Are these streaks long enough to support the belief he had hot hands?
+Let's talk about *independence*.
+Two processes are independent if the outcome of one provides us literally 0 information about the outcome of another.
+
+A shooter with a hot hand will have shots that are _not_ independent of one another. The hot hand model says he'll have a higher probability of making his second if he makes his first. (THINK  BAYES)
+
+## Simulations in R
+We don't have any data from non-hot hand shooters, but that's easy to simulate. We just have to set ground rules and then the computer uses random numbers to generate an outcome.
+
+Example: Simulate coin flipping
+```{r}
+coin_outcomes <- c("heads", "tails")
+sample(coin_outcomes, size = 1, replace = TRUE)
+```
+We can run this several times and see the outcome changes between heads and tails.
+
+What if we wanted to simulate 100 times? CHILDS PLAY
+```{r}
+sim_fair_coin <- sample(coin_outcomes, size = 100, replace = TRUE)
+sim_fair_coin
+table(sim_fair_coin)
+```
+
+What if we don't want the probabilities to be even? Oh man. Even easier.
+```{r}
+sim_unfair_coin <- sample(coin_outcomes, size = 100, replace = TRUE, prob = c(0.2, 0.8))
+table(sim_unfair_coin)
+```
+That's just straight up magic.
+Remember we can do ?sample to get help
+
+## Simulating the Independent Shooter
+Let's simulate 1 shot from a shooter with 50% shooting percentage.
+```{r}
+shot_outcomes <- c("H", "M")
+sim_basket <- sample(shot_outcomes, size = 1, replace = TRUE)
+sim_basket
+```
+
+What changes needs to be made to sample to make it reflect a shooting percentage of 45%? Make this adjustment then run a simulation to sample 133 shots. Assign output to sim_basket
+
+```{r}
+sim_basket <- sample(shot_outcomes, size = 133, replace = TRUE, prob = c(0.45, 0.55))
+table(sim_basket)
+```
+Now we have the data to compare Kobe to our Independent Shooter! Woohoo!
+
+## Comparing Kobe Bryant to the Independent Shooter
+<div id="exercise">
+**Exercise**: Using `calc_streak`, compute the streak lengths of `sim_basket`, and save the results in a data frame called `sim_streak`. Note that since the `sim_streak` object is just a vector and not a variable in a data frame, we don't need to first select it from a data frame like we did earlier when we calculated the streak lengths for Kobe's shots.
+</div>
+
+```{r}
+sim_streak <- calc_streak(sim_basket)
+table(sim_streak)
+ggplot(sim_streak, aes(x=length)) +
+  geom_histogram(binwidth = 1)
+```
+
+4.  If you were to run the simulation of the independent shooter a second time, how 
+would you expect its streak distribution to compare to the distribution from the 
+exercise above? 
+<ol>
+<li> Exactly the same  </li>
+<li> Somewhat similar </li>
+<li> Totally different </li>
+</ol>
+
+A: 2. Somewhat Similar
+
+
+5.  How does Kobe Bryant's distribution of streak lengths compare to the distribution 
+of streak lengths for the simulated shooter? Using this comparison, do you have 
+evidence that the hot hand model fits Kobe's shooting patterns?
+<ol>
+<li> The distributions look very similar. Therefore, there doesn't appear to be evidence for Kobe Bryant's hot hand. </li>
+<li> The distributions look very similar. Therefore, there appears to be evidence for Kobe Bryant's hot hand. </li>
+<li> The distributions look very different. Therefore, there doesn't appear to be evidence for Kobe Bryant's hot hand. </li>
+<li> The distributions look very different. Therefore, there appears to be evidence for Kobe Bryant's hot hand. </li>
+</ol>
+
+Personally, we don't have enough information to say whether there is or isn't a difference. **The graphs and tables begin to suggest evidence for the hot hand.**
