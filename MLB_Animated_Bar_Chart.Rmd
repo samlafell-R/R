@@ -1,0 +1,226 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+# MLB Animated 'Race' Barchart
+## Sam LaFell
+
+Recently, I found an article by Keith McNulty (https://towardsdatascience.com/how-to-do-that-animated-race-bar-chart-57f3a8ff27a8) on Medium about making that animated race bar chat. Well, I followed along his guide and worked through it. Now, I want to make my own animated race barchart with my own data (actually, Lahman's Database Data).
+
+So, I'm going to make the Race barchart that keeps track of which team has the most homeruns. This will be a cumulation of every players homeruns on that team for a given year. This will go from the 1800s to 2018.
+
+This fits similarly with another Python project I did, https://samsdatajourney.wordpress.com/2019/02/16/my-first-data-project-from-data-retrieval-to-data-visualization/. Obviously this is in R and the end goal is different, but a similar idea.
+
+We will have to do some cleaning and the visualization process will stay in R instead of exporting it to Tableau like I did with that one.
+
+First, I download the data from http://www.seanlahman.com/baseball-archive/statistics/.
+
+Next, we need to upload it. I'm working in RStudio Cloud at the moment. I also need to install all the packages and then call them.
+
+```{r}
+#install.packages("tidyverse")
+#install.packages("knitr")
+#install.packages("gganimate")
+#install.packages("gifski")
+#install.packages("png")
+library(tidyverse)
+library(knitr)
+library(gganimate)
+library(gifski)
+library(png)
+mlb <- read.csv("Batting.csv")
+```
+
+According to this History.com article, https://www.history.com/news/what-is-baseballs-modern-era, Baseballs Modern Era began in 1900. For this project, I am going to use 1900 as the first year and continue all the way to 2018. 
+
+So, this means we need to create a new data.frame to only include years after 1900.
+```{r filtering data to only include 1900 and later}
+str(mlb)
+mlb <- subset(mlb, mlb$yearID >= 1900)
+
+# Next, we want to give us less variables to make this dataset easier to work with
+mlb_less_columns <- select(mlb, c(playerID, yearID, teamID, lgID, HR))
+
+str(mlb_less_columns)
+```
+
+So we are on the right track. Unfortunately, though, when we run `r str(mlb_less_columns)` we see that teamID has 149 levels? We know that there are only 30 teams in the MLB so 149 is definitely a bit much.
+
+In doing my research on my last project, there are some team names that should be combined, and some that shouldn't. There are instances in which a Franchise moved cities, for example the Los Angeles Angels (current name) have been known as Anaheim Angels and a few other names.
+
+Similarly, the Marlins were renamed, and the Expos moved to become the Washington Nationals. In the next chunk, I will rename the teams.
+
+```{r reabbreviation the franchises to tally homerun totals appropriately}
+mlb_new_teams <- mutate(mlb_less_columns, teamID = case_when(
+  teamID == "SDN" | teamID == "SD" ~ "SD",
+  teamID == "NYA" | teamID == "NYY" ~ "NYY",
+  teamID == "NYN" | teamID == "NYM" ~ "NYM",
+  teamID == "CHN" | teamID == "CHC" ~ "CHC",
+  teamID == "SLN" | teamID == "STL" ~ "STL",
+  teamID == "LAN" | teamID ==  "LAD" | teamID == "BRO" ~ "LAD",
+  teamID == "SFN" | teamID == "SF" | teamID == "NYG" | teamID == "NY1" ~ "SF",
+  teamID == "TBA" | teamID == "TB" | teamID == "TBR" | teamID == "TBD" ~ "TB",
+  teamID == "ML4" | teamID == "MIL" ~ "MIL",
+  teamID == "CAL" | teamID ==  "LAA" | teamID == "ANA" ~ "ANA",
+  teamID == "FLO" | teamID ==  "MIA" ~ "MIA",
+  teamID == "MON" | teamID ==  "WAS" ~ "WAS",
+  teamID == "CIN" ~ "CIN",
+  teamID == "BSN" | teamID == "MLN" | teamID == "ATL" ~ "ATL",
+  teamID == "ARI" ~ "ARI",
+  teamID == "SLB" | teamID == "MLA" | teamID == "BAL" ~ "BAL",
+  teamID == "CHW" ~ "CHW",
+  teamID == "CLE" ~ "CLE",
+  teamID == "COL" ~ "COL",
+  teamID == "DET" ~ "DET",
+  teamID == "HOU" ~ "HOU",
+  teamID == "KCR" | teamID == "KCA" ~ "KCR",
+  teamID == "MIN" | teamID == "WSH" ~ "MIN",
+  teamID == "PHA" | teamID == "OAK" ~ "OAK",
+  teamID == "PHI" ~ "PHI",
+  teamID == "PIT" ~ "PIT",
+  teamID == "SEA" ~ "SEA",
+  teamID == "WSA" | teamID == "TEX" ~ "TEX",
+  teamID == "TOR" ~ "TOR",
+))
+
+str(mlb_new_teams)
+```
+
+With franchises moving, it's hard to know which teams belong together. Although, the baseball-reference page in my resources section really helped. I've dropped any teams that only existed for one year (most of those in 1914-1915 yearID) and only combined franchises with multiple years of existance.
+
+Next, we need to drop any values included from those franchises that only existed for one year. They should have a null value for teamID right now.
+
+```{r}
+mlb_new_teams <- subset(mlb_new_teams, !is.na(teamID))
+
+mlb_new_teams[2] <- lapply(mlb_new_teams[2], as.numeric)
+mlb_new_teams[5] <- lapply(mlb_new_teams[5], as.numeric)
+```
+
+
+Now, our data is cleaned up and ready to go. Let's start manipulating.
+
+## Manipulating the Data
+
+Lucky, homeruns are calculated for each player for each year. All we need to do is group_by yearID and teamID and sum the homeruns.
+
+```{r}
+total_homeruns <- mlb_new_teams %>%
+  group_by(teamID, yearID) %>%
+  summarize(HR = sum(HR))
+```
+
+Now, for the chart to work like we want. We need to create rolling sums that update every year.
+
+```{r creating rolling sums}
+table <- total_homeruns %>% 
+  dplyr::filter(yearID == 1900) %>% 
+  dplyr::select(yearID, teamID, Homeruns = HR)
+for (i in 1889:2017) {
+  table <- total_homeruns %>% 
+    dplyr::filter(yearID <= i) %>% 
+    dplyr::group_by(teamID) %>% 
+    dplyr::summarise(Homeruns = sum(HR, na.rm = TRUE)) %>% 
+    dplyr::mutate(yearID = i) %>% 
+    dplyr::bind_rows(table)
+}
+```
+
+```{r interesting facts}
+# add some historic facts to yearIDs
+table <- table %>% 
+  dplyr::mutate(
+    year_label = dplyr::case_when(
+      yearID <= 1900 ~ paste(yearID, "Beginning of the 'Modern Era' in MLB", sep = " - "),
+      dplyr::between(yearID, 1914, 1918) ~ paste(yearID, "World War I", sep = " - "),
+      dplyr::between(yearID, 1919, 1921) ~ paste(yearID, "Babe Ruth sold to the Yankees in 1920", sep = " - "),
+      dplyr::between(yearID, 1926
+                     , 1928) ~ paste(yearID, "Murderers' Row Yankees go 110-44 in 1927", sep = " - "),
+      dplyr::between(yearID, 1930, 1933) ~ paste(yearID, "Babe Ruth's Called Shot in 1932", sep = " - "),
+      dplyr::between(yearID, 1933, 1935) ~ paste(yearID, "First MLB All Star Game in 1933", sep = " - "),
+      dplyr::between(yearID, 1940, 1943) ~ paste(yearID, "Joe DiMaggio Hits in 56 Straight Games in 1941", sep = " - "),
+      dplyr::between(yearID, 1946, 1949) ~ paste(yearID, "Jackie Robinson Breaks the Color Barrier in 1947", sep = " - "),
+      dplyr::between(yearID, 1950, 1952) ~ paste(yearID, "The Shot Heard Round the World in 1951", sep = " - "),
+      dplyr::between(yearID, 1957, 1960) ~ paste(yearID, "Dodgers and Giants Move to California in 1958", sep = " - "),
+      dplyr::between(yearID, 1960, 1962) ~ paste(yearID, "Mazeroski Wins WS Game 7 for Yankees on a Walk-Off Homerun in 1960", sep = " - "),
+      dplyr::between(yearID, 1972, 1975) ~ paste(yearID, "Hank Aaron hits HR number 715", sep = " - "),
+      dplyr::between(yearID, 1984, 1987) ~ paste(yearID, "Pete Rose Passes Ty Cobb in 1985 for Career Hits in 1985", sep = " - "),
+      dplyr::between(yearID, 1994, 1997) ~ paste(yearID, "Cal Ripkin Passes Lou Gehrig for Consecutive Games in 1995", sep = " - "),
+      dplyr::between(yearID, 2001, 2003) ~ paste(yearID, "Baseball Returns to New York after 9/11", sep = " - "),
+      dplyr::between(yearID, 2004, 2006) ~ paste(yearID, "Red Sox win first World Series in 86 Years", sep = " - "),
+      dplyr::between(yearID, 2006, 2008) ~ paste(yearID, "Barry Bonds with 756 Career Homeruns in 2007", sep = " - "),
+      dplyr::between(yearID, 2008, 2009) ~ paste(yearID, "MLB Institutes Instant Reply on Home Runs in 2008", sep = " - "),
+      dplyr::between(yearID, 2016, 2018) ~ paste(yearID, "The Cubs win their first World Series in 108 Years in 2016", sep = " - "),
+      1L == 1L ~ as.character(yearID)
+    )
+  )
+```
+
+Now, Save it...
+
+```{r}
+save(table, file = "table.RData")
+```
+
+
+Now, the fun part!
+
+# Creating the Animation
+
+```{r retreiving top n ranking}
+anim_table <- table %>%
+  dplyr::group_by(yearID) %>%
+  dplyr::mutate(
+    rank = min_rank(-Homeruns) * 1,
+    Value_rel = Homeruns / Homeruns[rank == 1],
+    Value_lbl = paste0(" ", Homeruns)
+  ) %>%
+  dplyr::filter(rank <= 10) %>%
+  dplyr::ungroup()
+```
+
+```{r}
+p <- ggplot(anim_table, aes(rank)) +
+  geom_tile(aes(y = Homeruns/2,
+                height = Homeruns,
+                width = 0.9,
+                fill = "blue"
+                ), alpha = 0.8, color = NA) +
+
+  # text in x-axis (requires clip = "off" in coord_*)
+  # paste(country, " ")  is a hack to make pretty spacing, since hjust > 1 
+  #   leads to weird artifacts in text spacing.
+  geom_text(aes(y = 0, label = paste(teamID, " ")), size = 12, vjust = 0.2, hjust = 1) +
+  coord_flip(clip = "off", expand = FALSE) +
+  scale_y_continuous(labels = scales::comma) +
+  scale_x_reverse() +
+  guides(color = FALSE, fill = FALSE) +
+
+  labs(title='{closest_state}', x = "", y = "Total Homeruns") +
+  theme(plot.title = element_text(hjust = 0, size = 30),
+        axis.ticks.y = element_blank(),  # These relate to the axes post-flip
+        axis.text.y  = element_blank(),  # These relate to the axes post-flip
+        plot.margin = margin(2,2,1,16, "cm")) +
+
+  transition_states(year_label, transition_length = 4, state_length = 1) +
+  ease_aes('cubic-in-out')
+
+animate(p, fps = 5, duration = 100, width = 2000, height = 1200, renderer = gifski_renderer("mlb_homeruns.gif"))
+```
+
+There you go!
+There's room for the future to improve on this, i.e., spending more time verifying that the numbers are 100% accurate. I did some work on this for the project, but didn't want to spend too much time in nitty gritty details when my goal was to get the experience.
+
+Thanks for reading, and let me know what you think!
+
+
+Resources used:
+https://stackoverflow.com/questions/27091292/change-column-value-by-row-string-value-in-r
+
+https://www.baseball-reference.com/about/team_IDs.shtml
+
+https://towardsdatascience.com/how-to-do-that-animated-race-bar-chart-57f3a8ff27a8
+
