@@ -1,0 +1,80 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+## Cancer Genetics DNA
+
+load('~/Desktop/MSA/Linear Algebra/Data/geneCancerUCI.rdata')
+table(cancerlabels$Class)
+```
+
+Original Source: The cancer genome atlas pan-cancer analysis project
+
+BRCA = Breast Invasive Carcinoma
+COAD = Colon Adenocarcinoma
+KIRC = Kidney Renal clear cell Carcinoma
+LUAD = Lung Adenocarcinoma
+PRAD = Prostate Adenocarcinoma
+We are going to want to plot the data points according to their different classification labels. We should pick out a nice color palette for categorical attributes.
+
+```{r}
+library(RColorBrewer)
+display.brewer.all()
+```
+
+
+```{r}
+palette(brewer.pal(n = 8, name = "Dark2"))
+```
+
+The first step is typically to explore the data. Obviously we can’t look at ALL the scatter plots of input variables. For the fun of it, let’s look at a few of these scatter plots which we’ll pick at random. First pick two column numbers at random, then draw the plot, coloring by the label.
+
+
+```{r}
+randomColumns = sample(2:20532,2)
+plot(cancer[,randomColumns],col = cancerlabels$Class)
+```
+
+The prcomp function is the one I most often recommend for reasonably sized principal component calculations in R. This function returns a list with class “prcomp” containing the following components (from help prcomp):
+
+sdev: the standard deviations of the principal components (i.e., the square roots of the eigenvalues of the covariance/correlation matrix, though the calculation is actually done with the singular values of the data matrix).
+rotation: the matrix of variable loadings (i.e., a matrix whose columns contain the eigenvectors). The function princomp returns this in the element loadings.
+x: if retx is true the value of the rotated data (the centred (and scaled if requested) data multiplied by the rotation matrix) is returned. Hence, cov(x) is the diagonal matrix diag(sdev^2). For the formula method, napredict() is applied to handle the treatment of values omitted by the na.action.
+center, scale: the centering and scaling used, or FALSE.
+Now let’s compute the first two principal components and examine the data projected onto these axes. We can then look in 3 dimensions.
+
+```{r}
+
+pcaOut = prcomp(cancer[,2:20532],3, scale = F)
+plot(pcaOut$x[,1],pcaOut$x[,2],col = cancerlabels$Class, xlab = "Principal Component 1", ylab = "Principal Component 2", main = 'Genetic Samples Projected into 2-dimensions')
+```
+
+3-dimensional plot. Problem is to get the plot points colored by group, we need to write a function that creates a vector of colors
+
+```{r}
+colors = factor(palette())
+colors = colors[cancerlabels$Class]
+```
+
+Need rgl library
+```{r}
+#install.packages('rgl')
+library(rgl)
+plot3d(x = pcaOut$x[,1], y = pcaOut$x[,2],z= pcaOut$x[,3],col = colors, xlab = "Principal Component 1", ylab = "Principal Component 2", zlab = "Principal Component 3")
+```
+
+
+Proportion of Variance explained by 2 components:
+
+```{r}
+sum(pcaOut$sdev[1:2]^2)/sum(pcaOut$sdev^2)
+```
+
+Proportion of Variance explained by 3 components:
+
+```{r}
+sum(pcaOut$sdev[1:3]^2)/sum(pcaOut$sdev^2)
+```
