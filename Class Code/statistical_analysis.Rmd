@@ -1,0 +1,113 @@
+---
+title: "R Quiz 6"
+output: html_notebook
+---
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+
+#1 Load the following libraries:
+
+  #1.1 Assign the "mpg" dataset from the ggplot2 library to a new data frame named "df_mpg"
+
+  # How many observations are there in "df_mpg"
+
+```{r}
+library(ggplot2)
+df_mpg <- data.frame(ggplot2::mpg)
+dim(df_mpg)
+```
+
+
+#2 Use the cor function to determine correlations between the numeric variables in "df_mpg." What is the highest correlation, rounded to 2 digits?
+```{r}
+cor_matrix <- cor(select_if(df_mpg, is.numeric))
+View(cor_matrix)
+max(cor_matrix)
+```
+
+#3 Remove the variables "manufacturer", "model", "hwy", and "fl" from "df_mpg". How many columns are in "df_mpg"?
+```{r}
+df_mpg2 <- df_mpg[-c(1, 2, 9, 10)]
+colnames(df_mpg2)
+dim(df_mpg2)
+```
+
+#4 Test the hypothesis that cars built in "year" "1999" have no difference in "cty" mpg as cars built in "year" "2008" using a Welch's two sample t test.
+
+  #What is the p-value of the t test, rounded to two digits?
+
+```{r}
+t.result <- t.test(cty ~ year, data=filter(mpg, year %in% c('1999','2008')))
+t.result
+```
+
+#5 Spit the data into 70% training, "df_mpg_t", and 30% validation, "df_mpg_v" data sets.
+
+  #5.1 Use set.seed(1)
+
+  #5.2 Use createDataPartition from Caret, splitting on the variable "cty"
+
+  # How many observations are in "df_mpg_t"? 
+```{r}
+set.seed(1)
+train_ind <- createDataPartition(mpg$cty, p=0.70, list=FALSE)
+df_mpg_t <- df_mpg2[train_ind,]
+df_mpg_v <- df_mpg2[-train_ind,]
+dim(df_mpg_t)
+```
+
+#6 Create a linear regression model with response variable "cty" and independent variable "displ" from "df_mpg_t". 
+
+  #6.1 assign the model output to a variable "m1_fit"
+
+  #What is the Adj R2 of the model, rounded to 2 digits?
+```{r}
+m1_fit <- lm(cty~displ, 
+               data=df_mpg_t, 
+               method="lm")
+summary(m1_fit)
+```
+
+#7 Test the hypothesis that the residuals from "m1_fit" are normally distributed using a Shapiro test. 
+
+  #Is the null hypothesis rejected?
+  #Shapiro test - remember null hypothesis is distribution is normal
+
+```{r}
+shapiro.test(m1_fit$residuals)
+```
+
+
+#8 Fit a model, "m2_fit" that is a linear regression model with response variable "cty" and independent variables "displ" and "class".
+
+  #Using Adj R2 as a evaluation criteria, which model, "m1_fit" or "m2_fit" fits the data better?
+```{r}
+m2_fit <- lm(cty~displ+class, 
+               data=df_mpg_t, 
+               method="lm")
+
+summary(m2_fit)
+```
+
+
+#9 Score the validation data "df_mpg_v" with both models "m1_fit" and "m2_fit". 
+
+  #Which model, "m1_fit" or "m2_fit" performed better using RMSE as a evaluation criteria? Use the postResample function from Caret to determine the RMSE.
+```{r}
+library(caret)
+#Use the predict function 
+scored <- predict(m1_fit, df_mpg_v)
+scored
+
+#Evaluate the scoring
+postResample(scored, df_mpg_v$cty)
+
+
+#Use the predict function
+scored <- predict(m2_fit, df_mpg_v)
+scored
+
+#Evaluate the scoring
+postResample(scored, df_mpg_v$cty)
+```

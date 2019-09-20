@@ -1,0 +1,180 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+1 Prepare by:
+  #1.1 Import the required libraries:
+  #1.2 Set your working directory and upload the "Auto_MPG.csv" data. Ensure stringAsFactors=FALSE.
+  #1.3 Create a column names "Car_Make" from the first element of the "Car_Name" variable
+  #1.4 Update "horsepower" to be type numeric
+  #1.4 How many unique values of "Car_Make" are there?
+  
+```{r}
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+
+setwd("/Users/samlafell/Desktop/MSA/R/Class Data/")
+
+df_auto <- fread("MPG_Data.csv", stringsAsFactors = FALSE)
+
+df_auto <- df_auto %>%
+  group_by(Car_Name) %>%
+  mutate(Car_Make=str_split(Car_Name," ")[[1]][1]) %>% 
+  mutate(Car_Model=paste(str_split(Car_Name," ")[[1]][-1], collapse=" ")) %>%
+  ungroup(Car_Name)
+
+df_auto$Horsepower <- as.numeric(df_auto$Horsepower)
+
+n_distinct(df_auto$Car_Make)
+
+
+```
+
+
+We are going to create a function that provides am univariate analysis on a provided variable vector
+    
+#2 Change the type of "Cylinders", "Model_Year", and "Origin" from numeric to character.
+    # How many variables in "df_auto" are of type character?
+
+```{r}
+df_auto$Cylinders <- as.character(df_auto$Cylinders)
+df_auto$Model_Year <- as.character(df_auto$Model_Year)
+df_auto$Orgin <- as.character(df_auto$Orgin)
+
+str(df_auto)
+
+sum(is.character(df_auto))
+class(df_auto)
+typeof(df_auto$MPG)
+names(df_auto)
+typeof(df_auto$MPG)
+typeof(df_auto$Cylinders)
+typeof(df_auto$Displacement)
+typeof(df_auto$Horsepower)
+typeof(df_auto$Weight)
+typeof(df_auto$Acceleration)
+typeof(df_auto$Model_Year)
+typeof(df_auto$Orgin)
+typeof(df_auto$Car_Name)
+typeof(df_auto$Car_Make)
+typeof(df_auto$Car_Model)
+```
+
+
+#3 Create a function "univariate_analysis" that:
+    #3.1 Calculates the number of observations, mean, standard deviation, and quartiles of a provided vector. 
+      #3.1 Ensure the na.rm argument is TRUE
+    #3.2 Have the function return the results in a list with named elements "obs", "mean", "stdev", and "quartiles"
+    #Using the function created, what is the 2nd quartile of "MPG"?
+
+
+# 6 Thus far, we've assumed the variable provided will be numeric. However, we should account for categorical variables. 
+  # Update the "univariate_analysis" function to:
+    #6.1 If the provided vector is numeric, execute everything created in the function thus far
+    #6.2 If the provided vector is character:
+      #6.2.1 Store the number of elements in the vector in a variable named "obs"
+      #6.2.2 Store the unique values of the vector in a variable named "unique_levels" 
+      #6.2.1 Store a bar chart in a variable "bar_chart" that plots the number of observations by the unique levels of the variable 
+    #6.3 Returns the previous variables in a list with the elements named "obs", "unique_levels", and "bar_chart")
+    #Using the function created, what "Model_Year" has the greatest number of observations?
+```{r}
+univariate_analysis <- function(data){
+  
+  if(is.numeric(data)==FALSE){
+     obs <- length(data)
+     unique_levels <- n_distinct(data)
+     data <- as.data.frame(data)
+     bar_chart <- ggplot(data, aes(x=data)) +
+       geom_bar()
+     
+     l2 <- list(n_obs=obs, unique_levels=unique_levels, bar_chart=bar_chart)
+     return(l2)
+  }
+  
+  n <- length(data)
+  mean <- mean(data, na.rm = TRUE)
+  std <- sd(data, na.rm = TRUE)
+  percentiles  <- quantile(data, probs=c(0, 0.25, 0.50, 0.75, 1), na.rm = TRUE)
+  data <- as.data.frame(data)
+  
+  histogram <- ggplot(data, aes(x=data)) +
+    geom_histogram(bins=20) +
+    geom_vline(aes(xintercept = quantile(data)[2]), linetype = "dashed", colour = "red") +
+    geom_vline(aes(xintercept = quantile(data)[3]), linetype = "dashed", colour = "blue") +
+    geom_vline(aes(xintercept = quantile(data)[4]), linetype = "dashed", colour = "green") +
+    geom_text(aes(x=quantile(data)[2]-1.2, label="25% quartile", y=20), colour="red", angle=90, text=element_text(size=12)) +
+    geom_text(aes(x=quantile(data)[3]-1.2, label="50% quartile", y=32), colour="blue", angle=90, text=element_text(size=12)) +
+    geom_text(aes(x=quantile(data)[4]-1.2, label="75% quartile", y=20), colour="green", angle=90, text=element_text(size=12)) +
+    theme_minimal()
+  
+  
+  l1 <- list(n_obs=n, mean=mean, std=std, percentiles=percentiles, histogram=histogram)
+  return(l1)
+  
+}
+
+univariate_analysis(df_auto$Model_Year)
+
+```
+
+
+#4 To the "univariate_analysis" function, create a histogram plot named "histogram". Add the plot to the return list with the element named "histogram". 
+  #Note, you will be providing your function a vector, but ggplot only accepts data frames. You will need to convert your vector to a data frame with one column.
+  #What is the default number of bins in the histogram for "MPG"?
+
+```{r}
+univariate_analysis(df_auto$MPG)
+```
+
+ #6.3 Returns the previous variables in a list with the elements named "obs", "unique_levels", and "bar_chart")
+    #Using the function created, what "Model_Year" has the greatest number of observations?
+```{r}
+
+univariate_analysis(df_auto$Model_Year)
+
+
+```
+
+
+
+#7 Using the "univariate_analysis" function, what is the standard deviation of "Horsepower" 
+```{r}
+univariate_analysis(df_auto$Horsepower)
+
+sd(df_auto$Horsepower, na.rm = TRUE)
+
+sapply(df_auto, sd, na.rm = TRUE)
+
+```
+
+
+#8 Using the "univariate_analysis" function, what is the median of "Displacement" 
+```{r}
+univariate_analysis(df_auto$Displacement)
+
+```
+
+
+
+#9 Using the "univariate_analysis" function, what is the most common number of cylinders for cars in the data set?
+```{r}
+univariate_analysis(df_auto$Cylinders)
+
+```
+
+
+
+
+#10 Using the "univariate_analysis" function, what is the mean of Weight? 
+```{r}
+univariate_analysis(df_auto$Weight)
+```

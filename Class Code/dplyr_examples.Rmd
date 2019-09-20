@@ -1,0 +1,124 @@
+---
+title: "R Quiz 4"
+output: html_notebook
+---
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+
+Import Libraries
+```{r}
+library(data.table)
+library(dplyr)
+library(stringr)
+```
+
+
+Load the Data and Change the CWD
+```{r}
+setwd("/Users/samlafell/Desktop/MSA/R/Class Data")
+getwd()
+
+df_auto <- fread("MPG_Data.csv", stringsAsFactors = FALSE)
+```
+
+Convert "Horsepower" to Numeric
+```{r}
+df_auto$Horsepower <- as.numeric(df_auto$Horsepower)
+sum(is.na(df_auto$Horsepower))
+```
+
+#3 Using dplyr, add to "df_auto":
+  # 3.1 Variable named "Car_Make" that is the first word from "Car_Name"
+  # 3.2 Variable named "Car_Model" that is the remaining words (not first) from "Car_Name"
+  # How many observations of "Car_Make" "ford" are there?
+```{r}
+df_auto <- df_auto %>%
+  group_by(Car_Name) %>%
+  mutate(Car_Make=str_split(Car_Name," ")[[1]][1]) %>% 
+  mutate(Car_Model=paste(str_split(Car_Name," ")[[1]][-1], collapse=" ")) %>%
+  ungroup(Car_Name)
+
+sum(df_auto[10]=='ford')
+```
+
+#4 Using dplyr, how many cars are there for model year 73?
+```{r}
+df_auto %>%
+  group_by(Model_Year, Car_Name) %>%
+  filter(Model_Year==73)
+```
+
+#5 Using dplyr, what "Car_Make" "ford" car ("Car_Name") has the highest "Weight_per_Horsepower" (Weight/Horsepower) ratio? Ignore NAs.
+```{r}
+df_auto_ford <- df_auto %>%
+  group_by(Car_Name) %>%
+  mutate(Weight_per_Horsepower = mean(Weight/Horsepower, na.rm=TRUE)) %>%
+  filter(Car_Make=='ford') %>%
+  arrange(Weight_per_Horsepower) %>%
+  ungroup(Car_Name)
+
+df_auto
+```
+
+
+#6 Using dplyr, create a ranking variable, "MPG_Rank", that ranks, using the row_number() function, "MPG" by "Model_Year" in descending order.
+  # What is the third highest "MPG" "Car_Name" for "Model_Year" 1972?
+```{r}
+df_auto_new3<-df_auto %>%
+ arrange(Model_Year, desc(MPG))%>%
+ group_by(Model_Year)%>%
+ mutate(MPG_Rank=row_number())%>%
+ ungroup(Model_Year)
+
+filter(df_auto_new3, Model_Year=='72')
+```
+
+
+#7 Using dplyr and stringr, update "df_auto" so all values of "Car_Make" that contain "chev" say "chevrolet".
+  #How many observations have "Car_Make" "chevrolet"?
+```{r}
+current <- 'chev'
+new <- 'chevrolet'
+
+df_auto <- df_auto %>%
+  mutate(Car_Make = ifelse(str_detect(Car_Make, current), new, Car_Make))
+
+print(length(which(df_auto$Car_Make=='chevrolet')))
+```
+
+#8 What is the average MPG for "chevrolet" cars?
+```{r}
+df_auto %>%
+  group_by(Car_Make) %>%
+  summarise(AvgMPG = mean(MPG))
+```
+
+
+#9 Using dplyr joins, what is the average "MPG" for car makes where "First_Year" exists?
+```{r}
+Car_Make <- c("amc", "audi", "bmw", "buick", "chevrolet", "datsun", "dodge", "ford")
+First_Year <- c(1954, 1910, 1916, 1903, 1911, 1931, 1900, 1903)
+df_auto_start <- data.frame(Car_Make=Car_Make, First_Year=First_Year, stringsAsFactors = FALSE)
+
+df_auto_hold <- df_auto %>%
+  right_join(df_auto_start, by="Car_Make")
+
+mean(df_auto_hold$MPG)
+```
+
+#10 Using dplyr joins, how many cars exist in the data set where "First_Year" is null?
+```{r}
+# Left_join 
+df_auto_hold <- df_auto %>%
+  left_join(df_auto_start, by="Car_Make")
+
+# note, we've retained all of the records but it's placed "NA" in the column where it couldn't find a matching record
+dim(df_auto) 
+dim(df_auto_hold) 
+
+sum(is.na(df_auto_hold$First_Year))
+```
+
+
+
