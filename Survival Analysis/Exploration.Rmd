@@ -1,0 +1,264 @@
+---
+title: "Survival Analysis II"
+output: html_notebook
+---
+
+This was a homework assignment in Survival Analysis.
+
+In the homework assignment we had a dataset that recorded hurricanes and the subsequent damage these hurricanes did on pumps that could keep the surrounding affected areas safe during the critical 48 hour period following a hurricane.
+
+There is a committee that is conducting analysis for the pump stations in the Gulf Coast to see which pumps could be made better in order to prepare for future hurricanes.
+
+In this notebook we explore the pumps that failed and how they may be able to be improved in the future.
+
+
+
+Import Libraries
+```{r}
+library(haven)
+library(tidyverse)
+library(survival)
+library(survminer)
+library(flexsurv)
+```
+
+Import Data
+```{r}
+hurricane <- read_sas('~/Desktop/MSA/Survival Analysis/Homeworks/Homework1_SA/hurricane.sas7bdat')
+```
+
+
+## Find Distribution
+```{r}
+# Test All Distributions by building survival curves for each possible distribution
+like.e <- flexsurvreg(Surv(hour, reason == 1) ~ backup + age + bridgecrane + servo + gear + slope + elevation + trashrack, data = hurricane, dist = "exp")$loglik
+
+like.w <- flexsurvreg(Surv(hour, reason == 1) ~ backup + age + bridgecrane + servo + gear + slope + elevation + trashrack, data = hurricane, dist = "weibull")$loglik
+
+like.ln <- flexsurvreg(Surv(hour, reason == 1) ~ backup + age + bridgecrane + servo + gear + slope + elevation + trashrack, data = hurricane, dist = "lnorm")$loglik
+
+like.g <- flexsurvreg(Surv(hour, reason == 1) ~ backup + age + bridgecrane + servo + gear + slope + elevation + trashrack, data = hurricane, dist = "gamma")$loglik 
+
+like.ll <- flexsurvreg(Surv(hour, reason == 1) ~ backup + age + bridgecrane + servo + gear + slope + elevation + trashrack, data = hurricane, dist = "llogis")$loglik
+
+like.f <- flexsurvreg(Surv(hour, reason == 1) ~ backup + age + bridgecrane + servo + gear + slope + elevation + trashrack, data = hurricane, dist = "genf")$loglik # did not converge
+```
+
+Check p-Vals
+```{r}
+# Use Log-Likelihood to compare nested distributions in order to determine the most accurate underlying distribution for the data provided.
+
+pval.e.g <- 1 - pchisq((-2*(like.e-like.g)), 2)
+pval.w.g <- 1 - pchisq((-2*(like.w-like.g)), 1)
+pval.ln.g <- 1 - pchisq((-2*(like.ln-like.g)), 1)
+pval.g.f <- 1 - pchisq((-2*(like.g-like.f)), 1)
+pval.ll.f <- 1 - pchisq((-2*(like.ll-like.f)), 1)
+
+Tests <- c('Exp vs. Gam', 'Wei vs. Gam', 'LogN vs. Gam', 'Gam vs. F', 'LogL vs. F')
+P_values <- c(pval.e.g, pval.w.g, pval.ln.g, pval.g.f, pval.ll.f)
+cbind(Tests, P_values)
+```
+
+
+Winners --
+Gamma
+Weibull -- choose Weibull because it's the larger distribution
+Gamma
+F -- does not converge
+F -- does not converge
+
+
+
+## Use Weibull to move forward
+```{r}
+all_vars_survreg <- survreg(Surv(hour, reason == 1) ~ backup + age + bridgecrane + servo + gear + slope + elevation + trashrack, data = hurricane, dist = "weibull")
+
+summary(all_vars_survreg)$table[,4]
+
+# Do backward selection
+back.model <- step(all_vars_survreg, direction = "backward")
+summary(back.model)
+back.model
+
+
+# New Model
+final_survreg <- survreg(Surv(hour, reason == 1) ~ backup + servo + slope, data = hurricane, dist = "weibull")
+summary(final_survreg)
+# Final Vars -- Backup, Servo, Slope. These are the important variables moving forward in our analysis.
+# We can't change the slope of the surrounding ravine, so we will be comparing Backup and Servo to see which improvements should be made in the future.
+```
+
+
+Table of p-Values
+```{r}
+p_vals <- data.frame(summary(final_survreg)$table[,4])
+names(p_vals) <- c("P-Values of Significant Variables")
+p_vals
+write.csv(p_vals, "~/Desktop/MSA/Survival Analysis/Homeworks/Homework2_SA/p_vals.csv")
+```
+
+Interpretation of most significant variable...
+- Most Significant: Slope. 
+  - For every 1 unit increase in slope, there is a `expm1(0.0606)/(1+(expm1(.0606)))` survival time decreased by 5.88%.
+```{r}
+expm1(0.0606)/(1+(expm1(.0606)))
+```
+
+
+Analyze the pumps that failed and get an understanding of why and what you might upgrade.
+- You only have $2.5M
+- You can only upgrade each pump once
+
+Provide a list of pumps and the upgrades
+- For each pump, estimate the time benefit for that pump
+
+
+General Model Building
+```{r}
+# Build the model on the whole data
+final_survreg <- survreg(Surv(hour, reason == 1) ~ backup + servo + slope, data = hurricane, dist = "weibull")
+
+# Survival Probability that it lasted as long as it did
+survprob.actual <- 1 - psurvreg(hurricane$hour,
+                                mean = predict(final_survreg, type = "lp"),
+                                scale = final_survreg$scale,
+                                distribution = final_survreg$dist)
+head(survprob.actual, n = 10)
+
+
+# Survival Probability that it lasted 10 hours
+survprob.10hours <- 1 - psurvreg(10,
+                              mean = predict(final_survreg, type = "lp"),
+                              scale = final_survreg$scale,
+                              distribution = final_survreg$dist)
+head(survprob.10hours)
+
+
+# Predicted Change in Event Time #
+new_time <-  qsurvreg(1 - survprob.actual,
+                      mean = predict(final_survreg, type = "lp") + coef(final_survreg)['backup'],
+                      scale = final_survreg$scale,
+                      distribution = final_survreg$dist)
+
+hurricane$new_time_backup <- new_time
+hurricane$diff_backup <- hurricane$new_time_backup - hurricane$hour
+
+
+# Predicted Change in Event Time #
+new_time <-  qsurvreg(1 - survprob.actual,
+                      mean = predict(final_survreg, type = "lp") + coef(final_survreg)['servo'],
+                      scale = final_survreg$scale,
+                      distribution = final_survreg$dist)
+
+hurricane$new_time_servo <- new_time
+hurricane$diff_servo <- hurricane$new_time_servo - hurricane$hour
+
+head(data.frame(hurricane$hour, hurricane$new_time_servo, hurricane$diff_servo), n = 10)
+```
+
+```{r}
+# Add in an index column
+id <- rownames(hurricane)
+hurricane <- cbind(id, hurricane)
+```
+
+
+
+Do we have any that don't have a backup OR a servo and we need to compare to see what the better upgrade would be for those?
+
+Next up, you have a few decisions...
+1. Upgrade with Backup
+2. Upgrade with Servo
+3. Don't upgrade
+
+In order to make those decisions, you need to know if either Backup or Servo get you to that 48 hour mark (when observations will become censored). If neither Backup nor Servo get you to the 48 hour mark, then you just don't upgrade.
+So here, we can create a new column in the `flood_noservo_nobackup` to identify if either of those new times was at least 48
+```{r}
+# Subset to look for no backup and no servo to see which improvement is better for the ones that don't have either
+flood_noservo_nobackup <- hurricane %>% filter(reason==1 & servo==0 & backup==0)
+
+# Ifelse() statements to identify where the most sensible improvements can be made
+flood_noservo_nobackup$upgrade_status <- ifelse(flood_noservo_nobackup$new_time_backup < 48 & flood_noservo_nobackup$new_time_servo < 48, "neither upgrade gives 48 hrs", ifelse(flood_noservo_nobackup$new_time_backup >= 48, "backup gives 48 hours", ifelse(flood_noservo_nobackup$new_time_servo >= 48, "servo gives 48 hours", 0)))
+```
+
+We wanted to put Backup first in our ifelse loop because that upgrade is cheaper. Therefore, if that upgrade gets us to at least 48 hours, we want to give preference to that upgrade
+
+```{r}
+# Lets arrange by "backup gives 48 hours"
+backup_improvements <- flood_noservo_nobackup[order(flood_noservo_nobackup$upgrade_status),] %>%
+  dplyr::select(id, hour, upgrade_status, new_time_backup, diff_backup) %>%
+  dplyr::filter(upgrade_status == "backup gives 48 hours") %>%
+  dplyr::arrange(hour)
+```
+
+```{r}
+# Lets arrange by "servo gives 48 hours"
+servo_improvements <- flood_noservo_nobackup[order(flood_noservo_nobackup$upgrade_status),] %>%
+  dplyr::select(id, hour, upgrade_status, new_time_servo, diff_servo) %>%
+  dplyr::filter(upgrade_status == "servo gives 48 hours") %>%
+  dplyr::arrange(hour)
+```
+
+```{r}
+# Filter down to the backups that would not have come up in the search earlier
+flood_servo_nobackup <- hurricane %>% filter(reason==1 & servo==1 & backup==0)
+
+# Label if these new_times made it to at least 48 hours
+flood_servo_nobackup$upgrade_status <- ifelse(flood_servo_nobackup$new_time_backup >= 48, "backup gives 48 hours", "backup does not give 48 hours")
+
+backup_improvements2 <- flood_servo_nobackup %>%
+  dplyr::select(id, hour, upgrade_status, new_time_backup, diff_backup) %>%
+  dplyr::filter(upgrade_status == "backup gives 48 hours") %>%
+  dplyr::arrange(hour)
+```
+
+```{r}
+# Filter down to the servos that would not have come up in the search earlier
+flood_noservo_backup <- hurricane %>% filter(reason==1 & servo==0 & backup==1)
+
+# Label if these new_times made it to at least 48 hours
+flood_noservo_backup$upgrade_status <- ifelse(flood_noservo_backup$new_time_servo >= 48, "servo gives 48 hours", "servo does not give 48 hours")
+
+servo_improvements2 <- flood_noservo_backup %>%
+  dplyr::select(id, hour, upgrade_status, new_time_servo, diff_servo) %>%
+  dplyr::filter(upgrade_status == "servo gives 48 hours") %>%
+  dplyr::arrange(hour)
+```
+
+
+```{r}
+names(backup_improvements) <- c("id", "hour", "upgrade_status", "new_time", "time_diff")
+names(backup_improvements2) <- c("id", "hour", "upgrade_status", "new_time", "time_diff")
+names(servo_improvements) <- c("id", "hour", "upgrade_status", "new_time", "time_diff")
+names(servo_improvements2) <- c("id", "hour", "upgrade_status", "new_time", "time_diff")
+
+all_improvements <- rbind(backup_improvements, backup_improvements2, servo_improvements, servo_improvements2)
+
+all_improvements <- all_improvements %>% arrange(hour)
+```
+
+
+How much would all those cost?
+```{r}
+options(digits=10)
+
+# Create a new column that puts in the cost for each upgrade
+all_improvements$cost <- ifelse(all_improvements$upgrade_status == "servo gives 48 hours", 150000, 100000)
+
+# Arrange the dataframe by hour to get the best changes
+all_improvements <- all_improvements %>% arrange(hour)
+
+# Create a cumulative sum column to keep track of when we hit out $2.5M limit
+all_improvements$cum_cost <- cumsum(all_improvements$cost)
+
+# How much do they all cost?
+sum(all_improvements$cost)
+# $3.5M so we will definitely have to sacrifice some upgrades
+
+# Create a new dataframe of the upgrades that can be made within our $2.5M limit
+feasible_upgrades <- all_improvements %>% filter(cum_cost < 2500000)
+
+# Get a list of the Pump IDs
+feasible_upgrades$id <- feasible_upgrades$id %>% droplevels
+feasible_upgrades$id
+```

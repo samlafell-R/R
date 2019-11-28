@@ -1,0 +1,37 @@
+---
+title: "Sequence Analysis"
+output: html_notebook
+---
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+In Web Analytics: Called "Path Analytics"
+
+Load the Data
+```{r}
+load("~/Desktop/MSA/Data Mining/Code/R/FaultCodes.rdata")
+```
+
+Use Seqecreate from TraMineR
+* Undocumented
+```{r}
+#install.packages('TraMineR')
+library(TraMineR)
+#FCseqdata = seqecreate(id=FC$vehicleID, timestamp=FC$sequence, event=FC$Code)
+#FCsubseqdata <- seqefsub(FCseqdata, pMinSupport=0.005)
+#rules = TraMineR:::seqerules(FCsubseqdata)
+head(rules)
+```
+
+Want to convert this to a probability/percentage
+```{r}
+#rules$Support = rules$Support/15075
+rules=rules[order(-rules$Support),]
+#rules=rules[order(-rules$Conf),]
+#rules=rules[order(-rules$Lift),]
+rules[1:10,]
+```
+
+In the top 10, we see a lot of A's and B's as the antecedents and various ones as subsequents
+
+So, C's and F's were supposedly the worst. So we needed to look for things other than C and F in the antecedents so see if A's or B's could let us know that C's or F's were going to burn up before they actually do.

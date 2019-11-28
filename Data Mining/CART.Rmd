@@ -1,0 +1,124 @@
+---
+title: "CART in R"
+output: html_notebook
+---
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+Set working directory, seed, load data.
+```{r}
+options(digits=2)
+setwd("~/Desktop/MSA/Data Mining/Data")
+load("breast_cancer.rdata")
+set.seed(7515)
+perm=sample(1:699)
+BC_randomOrder=BCdata[perm,]
+```
+
+Split the data
+```{r}
+train = BC_randomOrder[1:floor(0.75*699),]
+test = BC_randomOrder[(floor(0.75*699)+1):699,]
+```
+
+Next, build the default decision tree model using trophy as the metric.
+`rpart` package is the most popular
+```{r}
+#install.packages("rpart")
+library(rpart)
+tree = rpart(Target ~ . - Target, data=train, method='class',
+             parms = list(split='entropy'))
+```
+
+To display the decision tree, and label it, use the plot() and text() functions.
+uniform=T causes all branches to have the sample length.
+```{r}
+.pardefault = par()
+par(mai=c(.2, .2, .2, .2))
+plot(tree, uniform=T)
+text(tree)
+#text(tree,use.n=T)
+par(.pardefault)
+```
+
+Examine variable importance
+```{r}
+tree$variable.importance
+```
+
+Bar chart to visualize importance
+```{r}
+library('lattice')
+barchart(tree$variable.importance[order(tree$variable.importance)],
+         xlab = 'Importance', horiz=T, xlim=c(0,2000), ylab='Variable',
+         main = 'Variable Importance', cex.names=0.8, las=2, col='orange')
+```
+
+R has `predict()` which is dope af
+Output is a vector or matrix of predictions
+We want to determine misclassification rate
+```{r}
+tscores = predict(tree, type='class')
+scores = predict(tree, test, type='class')
+
+cat('Training Misclassification Rate:', sum(tscores!=train$Target)/nrow(train))
+```
+
+Test Misclassification
+```{r}
+cat('Validation Misclassification Rate:', sum(scores!=test$Target)/nrow(train))
+```
+
+Visual Aesthetics
+```{r}
+#Fancy Tree Plot
+#install.packages("rattle")
+library(rattle)
+
+#Enhanced Tree Plot
+#install.packages("rpart")
+library(rpart.plot)
+
+# Color Selection for Fancy Plot
+#install.packages("RColorBrewer")
+library(RColorBrewer)
+
+# Alternative Decision Tree Algorithm
+#install.packages("party")
+library(party)
+
+# Convert rpart object to Binary Tree
+#install.packages("partykit")
+library(partykit)
+
+
+```
+
+
+Building graphs
+```{r}
+# Label Branches and Nodes with % of obs
+prp(tree, type=3, extra=100)
+
+#Label Branches and Nodes with Misclassification Rate
+prp(tree, type=3, extra=2)
+
+#Label Branches and Nodes with predicted probability of the class
+prp(tree, type=3, extra=8)
+
+# BEWARE: with Binary Trees where we typically want to show probability of success/failure for every node in the tree
+
+prp(tree, type=0, extra=8, leaf.round=1, border.col=1,
+    box.col=brewer.pal(10,"Set3")[tree$frame$yval], )
+```
+
+
+```{r}
+# Lift Chart 
+perf <- performance(pred, measure = "lift", x.measure = "rpp")
+plot(perf, lwd = 3, colorize = TRUE, colorkey = TRUE,
+     colorize.palette = rev(gray.colors(256)),
+     main = "Lift Chart for Training Data")
+abline(h = 1, lty = 3)
+```
+

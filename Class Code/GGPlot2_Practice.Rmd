@@ -1,0 +1,380 @@
+---
+title: "GGPlot2 Practice"
+output: html_notebook
+---
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+Practice some GGPlot visualizations in order to know how to do them before beginning a R-Shiny App.
+```{r Load Packages}
+#install.packages( "shiny" )
+#install.packages( "ggplot2" )
+#install.packages( "maps" )
+#install.packages( "mapproj" )
+library(shiny)
+library(ggplot2)
+library(maps)
+library(mapproj)
+```
+
+A look at a Base R Visualization
+```{r}
+barplot( trees$Height, names.arg=row.names( trees ), main="Tree Height", col="lightblue", xlab="ID", ylab="Height" )
+```
+
+
+Now, do the same thing in ggplot2
+```{r}
+x_lbl <- row.names( trees )
+x_lbl <- factor(x_lbl, levels=unique(x_lbl))
+
+ggplot(data=trees, aes(x=x_lbl, y=Height ) ) + 
+  geom_bar(fill="lightblue", stat="identity" ) + 
+  xlab("ID") + ggtitle("Tree Height")
+```
+
+
+ggplot2 is based on the grammar of graphics, a foundation proposed by Leland Wilkinson to generate visualizations. In this context, a chart is divided into individual components — data, annotations, scales, and so on — that are connected together using addition. In the example above, each command has the following meaning.
+https://www.amazon.com/Grammar-Graphics-Statistics-Computing/dp/0387245448?ie=UTF8&tag=flowingdata-20
+
+* For Graphics, you need to break down graphics to the individual components
+
+# GGPlot 2 Functionalities
+
+* x_lbl = row.names( trees )
+  + There are no specific names for each tree, so we want to label the x-axis numerically from 1 to 31, the total number of trees. row.names( trees ) provides a list of row indices for the data frame as a character vector.
+
+* x_lbl <- factor( x_lbl, levels=unique( x_lbl ) );
+  + This converts x_lbl from a character vector into a factor (i.e., a list of categories). Because of the way characters are sorted, factor( x_lbl ) would produce an order of 1, 10, 11, …, 2, 20, 21, …, 3, 30, 31, 4, 5, … . To get the proper order of 1, 2, 3, … 31, we specify the levels in the factor with levels=unique( x_lbl ). This produces a properly ordered list of unique category values (in this case, the numbers from 1 to 31 in order).
+ 
++ As with many things in R, there are different ways to produce an identical result. For example, we could have converted the character vector of row indices to a numeric vector, then to a factor. We would not need to use unique() in this scenario, since the numeric vector would be properly ordered, and there are no duplicate indices.
+
+* ggplot( data=trees, aes(x=x_lbl, y=Height) ) + geom_bar( fill="lightblue", stat="identity" ) + xlab( "ID" ) + ggtitle( "Tree Height" )
+  + This produces the final bar chart. We first specify the data source and axes, followed by the representation type (a bar chart), followed by an x-axis label and a chart title.
+  
+
+Here, there's a data part. A basic framework part. How we will represent the data. And other labels we will attach to the data.
+
+# Charts
+
+## Bar Charts
+
+```{r}
+# Investigate Beaver
+str( beaver1 )
+
+# Save Beaver1 to a df
+df <- beaver1
+
+# Turn day into a factor (give it a meaning)
+df$day <- as.factor( df$day )
+
+# Give activ a meaning (turn into factors) with either inactive or active.
+df$activ <- factor( df$activ, labels=c( "inactive", "active" ) )
+
+# Split up be active or inactive
+df <- df[ order( df$activ ), ]
+
+# Show a stacked bar chart where 1 part is where it's inactive and where it's active
+ggplot( df, aes( x=day, y="", fill=activ ) ) + geom_bar( stat="identity" ) + ylab( "Activity" ) + ggtitle( "Beaver Activity vs Inactivity" )
+```
+
+
+New Bar Chart
+```{r}
+# Grab Day and Activity from Beaver1 and turn it into a new df
+df <- table( beaver1[ , c( 1, 4 ) ] )
+
+# Turn the df into a dataframe
+df <- as.data.frame( df )
+
+# Create levels of inactive and active
+levels( df$activ ) <- c( "inactive", "active" )
+
+# Investigate
+df
+
+# position='dodge'... Don't stack it on top, dodge it to the right. I.e., create two sections
+ggplot( df, aes( x=day, y=Freq, fill=activ ) ) + 
+  geom_bar( stat="identity", position="dodge" ) + 
+  ylab( "Activity" ) + 
+  ggtitle( "Beaver Activity vs Inactivity" ) 
+```
+
+## Line Charts
+```{r}
+# Give trees row names an index.
+x_lbl <- as.numeric( row.names( trees ) )
+
+# Create line chart of heights on the y-axis by the index on the x-axis
+ggplot( data=trees, aes(x=x_lbl, y=Height) ) + 
+  geom_line( colour="red", linetype="dashed", size=1.0 ) + 
+  xlab( "ID" ) + 
+  ggtitle( "Tree Height" )
+```
+
+
+GGPlot uses the combination of all factor variables to group points. So that's why we didn't use a factor for the x-axis. You Could do it...
+```{r}
+# Create sequence of row names
+x_lbl <- row.names( trees )
+
+# Turn row names into factors
+x_lbl <- factor( x_lbl, levels=unique( x_lbl ) )
+
+# Plot
+ggplot( data=trees, aes(x=x_lbl, y=Height, group=1 ) ) + 
+  geom_line( colour="red", linetype="dashed", size=1.0 ) + 
+  geom_point( color="red", size=3.0, shape=1 ) + xlab( "ID" ) + 
+  ggtitle( "Tree Height" ) 
+```
+
+
+
+Notice that we also used geom_point to add an open circle at each height value. The shape argument defines how points are displayed. Shapes are defined numerically to provide open and filled circles, squares, triangles, other glyphs like plus and X-symbols.
+http://www.cookbook-r.com/Graphs/Shapes_and_line_types/
+
+We can also built multi-line charts, where each line represents a separate factor. Consider the chickwts dataset, which lists chicken weight by the type of feed it was given. The following code generates a multi-line chart, one line per feed type, showing the weight of each chicken that received the given feed.
+
+```{r}
+# Sample Series, not quite time series
+# Evaluate the dataset
+str( chickwts )
+
+# Turn into a dataframe
+df <- chickwts
+
+# Turn  the different types of feed into a table
+cat <- table( df$feed )
+
+# Initialize a numeric 0 before the for loop
+idx <- numeric()
+# For each element in category, find where that category ends
+# Samples are grouped together. So find out which chicks correspond to which samples
+for( i in 1:length( cat ) ) {
+  idx <- c( idx, 1:cat[ i ] )
+}
+
+# Turn that into a factor
+df$x_lbl <- as.factor( idx )
+
+#x-label is that factor
+ggplot( data=df, aes( x=x_lbl, y=weight, group=feed, color=feed))+#Grouped by feed and colored by feed
+  geom_line( size=1.0 ) + 
+  geom_point( size=4.0, shape=20 ) + 
+  xlab( "ID" ) + 
+  ggtitle( "Chicken Weight by Feed Type" ) 
+```
+
+## Pie Charts
+```{r}
+# Aggregate chicken weights by feed, and the aggregate measure is mean()
+df <- aggregate( chickwts$weight, by=list( chickwts$feed ), FUN=mean )
+
+# Give the columns some names
+names( df ) <- c( "feed", "weight" )
+
+# Reorder the feeds from Biggest to Smallest
+df$feed <- reorder( df$feed, order( -df$weight ) )
+
+# Stacked Bar Chart
+ggplot( df, aes( x="", y=weight, fill=feed ) ) + 
+  geom_bar( stat="identity", width=0.25 ) + 
+  ggtitle( "Mean Chicken Weighty by Feed Type" ) 
+```
+
+Do the exact same thing except change the coord_polar
+```{r}
+df <- aggregate( chickwts$weight, by=list( chickwts$feed ), FUN=mean )
+names( df ) <- c( "feed", "weight" )
+df <- df[ order( -df$weight ), ]
+ggplot( df, aes( x="", y=weight, fill=feed ) ) + geom_bar( stat="identity" ) + coord_polar( "y", start=0 ) + ggtitle( "Mean Chicken Weighty by Feed Type" ) 
+```
+
+
+Now, let's get fancy
+```{r}
+df <- aggregate( chickwts$weight, by=list( chickwts$feed ), FUN=mean )
+names( df ) <- c( "feed", "weight" )
+df <- df[ order( -df$weight ), ]
+lbl <- paste( df$feed, "\n", round( df$weight / 16.0, 1 ), "lb", sep = "" )
+
+# Assign colors to our palette. Found from Color Brewer.
+cb_palette <- c( "#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2" )
+
+df$pos <- cumsum( df$weight ) - ( df$weight / 2 )
+df$feed <- factor( df$feed, levels = df$feed[ order( df$weight ) ] )
+pie <- ggplot( df, aes( x="", y=weight, fill=feed ) )
+pie <- pie + geom_bar( colour="black", stat="identity" ) + coord_polar( "y", start=0 )
+pie <- pie + theme( axis.ticks=element_blank(), axis.title=element_blank(), axis.text.y=element_blank(), axis.text.x=element_text( colour="black" ), legend.position="none" )
+pie <- pie + scale_y_continuous( breaks=df$pos, labels=lbl )
+pie <- pie + scale_fill_manual( values=cb_palette )
+pie <- pie + ggtitle( "Mean Chicken Weight by Feed Type" )
+print( pie ) 
+```
+
+No more than 7 categories in a pie chart. Throw things into "other" category.
+
+
+
+## Scatterplots
+```{r}
+df <- trees
+
+# Create a basic scatterplot
+ggplot( data=df, aes( x=Height, y=Volume ) ) + 
+  geom_point( shape=20, size=3.0 ) + 
+  ggtitle( "Tree Height vs Volume" ) 
+```
+
+
+The figure suggests there appears to be a relationship between tree height and volume, but it would be useful to plot a regression line through the points to see how well it fits the data, and what its slope is. This can be done in ggplot using the geom_smooth command.
+```{r}
+df <- trees
+ggplot( data=df, aes( x=Height, y=Volume ) ) + 
+  geom_point( shape=20, size=3.0 ) + 
+  geom_smooth( method=lm ) + 
+  ggtitle( "Tree Height vs Volume" ) 
+```
+
+Adding the regression line and confidence interval seems to further confirm a relationship between tree height and volume. Accessing the lm function directly confirms a p-value of less than 0.05, the normal cutoff for rejecting the null hypothesis.
+```{r}
+reg <- lm( trees$Height ~ trees$Volume )
+summary( reg )
+```
+
+
+## Histograms
+
+* Histograms allow you to: 
+  + (1) count the number of occurrences in a categorical variable, or
+  + (2) discretize a continuous variable, then count the number of occurrences of values within a predefined set of ranges or bins. 
+
+* Both approaches are demonstrated below. The first uses the built in airquality dataset and treats temperature as a factor (i.e., as a categorical variable) to count the number of temperature occurrences within the dataset. The second uses the chickwts to count the number different chicken weights using equal-width bins of eight ounces.
+
+```{r}
+df <- airquality
+
+# Temps are on a 1 degree farenheight scale. So you can create a factor
+df$Temp <- as.factor( df$Temp )
+
+
+#scale_y_continuous just specifies the breaks
+# Histogram of discrete variables is a bar chart with discretization of the y axis
+ggplot( data=df, aes( x=Temp ) ) + 
+  geom_bar( color="black", fill="palegreen2" ) + 
+  xlab( "Temperature F" ) + 
+  ylab( "" ) + 
+  scale_y_continuous( breaks=c( 1, 3, 5, 7, 9, 11 ) ) + 
+  ggtitle( "Temperature Counts" ) 
+```
+
+
+```{r}
+df <- chickwts
+
+# Chicken weights is a continuous variable
+# Specify bin width based on the variable
+# Automatically creates the number of bars
+ggplot( data=df, aes( x=weight ) ) + 
+  geom_histogram( binwidth=8, color="black", fill="lightblue", alpha=0.7 ) + 
+  ylab( "" ) + 
+  ggtitle( "Chicken Weight Counts" ) 
+```
+
+
+## Boxplots
+
+A final chart that is often useful in statistics is the boxplot, a visualization that identifies the median, the second and third quartiles boundaries Q1 and Q3, and the inner and outer "fences", normally 1.5 × IQR (inter-quartile range Q3 - Q1) below and above Q1 and Q3. Any points outside the fences are plotted as outliers.
+
+An example of boxplots for chickwts feed type versus average weight can be constructed as follows.
+```{r}
+ggplot( data=chickwts, aes( x=feed, y=weight ) ) + 
+  geom_boxplot( colour="blue", fill="white", outlier.colour="red", outlier.shape=1 ) 
+```
+
+
+This boxplot shows only a few outliers in the "sunflower" feed type category. 
+Another example uses the iris dataset to plot Sepel Width by Species. 
+This shows a few additional outliers, both above and below the IQR fences. 
+We have also used geom_dotplot to display all of the data points at their corresponding Sepal Width positions, overlaid on top of the boxplot.
+```{r}
+box <- ggplot( data=iris, aes( x=Species, y=Sepal.Width ) )
+box <- box + geom_boxplot( lwd=1, color="black", fill="white" )
+box <- box + geom_dotplot( aes( fill=Species ), binaxis="y", stackdir="center", method="histodot", binwidth=0.1, dotsize=0.75 )
+print( box ) 
+```
+
+
+
+## Maps
+
+ggplot also has the ability to visualize data on maps using commands like geom_map and coord_map.
+
+```{r}
+states <- map_data( "state" )
+
+ggplot() + 
+  geom_map(data=states, map=states, aes(x=long, y=lat, map_id=region ), fill="white", colour="black")
+```
+
+```{r}
+states <- map_data( "state" )
+
+ggplot() + 
+  geom_map(data=states, map=states, aes(x=long, y=lat, map_id=region), fill="white", colour="black") +
+  coord_map( "albers", lat0=29.5, lat1=49.5 )  # Albers requires 2 latitudes. Official USGS map of the contential US uses 29.5 and 49.5.
+```
+
+The R code above produces a basic map of the U.S., then warps it using an Albers map projection. An Albers projection requires two parallels to project about, defined as lat0=29.5 and lat1=49.5. The current USGS standard is to display maps using Albers projection, and for maps of the continental United States, parallels of 29.5°N and 49.5°N are recommended.
+
+## Chloropleth Maps
+
+To produce a map with data overlaid, you normally start by drawing a base map, then adding a second map layer using geom_map containing the data you want to visualize.
+
+For example, suppose we wanted to visualize a choropleth map of state population. The R built in state.x77 data frame contains various information about US states, including estimated population in millions as its first column. We can use this to colour individual states darker for lower populations and lighter for higher populations.
+
+```{r}
+states <- map_data( "state" )
+
+#state.x77 is base r and has a lot of info about states
+#tolower() makes it lower-case
+choropleth <- data.frame( ID = tolower( rownames( state.x77 ) ), pop = state.x77[ , 1 ] ) 
+
+# Make base map
+map <- ggplot() + geom_map( data=states, map=states, aes( x=long, y=lat, map_id=region ), fill="white", colour="black" )
+
+# Add geom_map with data = choropleth
+# pop and ID are critical
+  # Map_ID in the aes is figuring out how to append populations to states
+  # map_id = region for the base map
+  # ID contains the names of the states
+  # Idea of a simple join
+map <- map + geom_map( data=choropleth, map=states, aes( fill=pop, map_id=ID ) )
+
+# Then use albers projection
+map <- map + coord_map( "albers", lat0=29.5, lat1=49.5 )
+
+# print
+print( map ) 
+```
+
+
+## Dot Maps
+```{r}
+states <- map_data( "state" )
+coords <- read.csv( url( "http://www.csc.ncsu.edu/faculty/healey/msa-18/shiny/cities-coords.csv" ), header=TRUE, sep="," )
+data <- read.csv( url( "http://www.csc.ncsu.edu/faculty/healey/msa-18/shiny/cities-data.csv" ), header=TRUE, sep="," )
+data <- data[ data$City != "Houston" & data$Year == 2012, ]
+points <- merge( coords, data, by.x = c( "City", "State" ), by.y = c( "City", "State" ) )
+points$Size <- pmax( points$Population / 500000.0, rep( 5.0, 6 ) )
+map <- ggplot() + geom_map( data=states, map=states, aes( map_id=region ), fill="white", colour="black" )
+map <- map + geom_point( data=points, aes( x=Longitude, y=Latitude ), colour="blue", size=points$Size, alpha=0.7 )
+map <- map + coord_map( "albers", lat0=29.5, lat1=49.5 )
+print( map ) 
+```
+

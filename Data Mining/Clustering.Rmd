@@ -1,0 +1,37 @@
+---
+title: "Cluster Analysis"
+output: html_notebook
+---
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+```{r}
+# Load up the data
+load("~/Desktop/MSA/Data Mining/Data/PenDigits.Rdata")
+
+# Already has train and test split
+pendig = rbind(train, test)
+
+# Create a subset of the digit data
+subset1 = pendig[pendig$digit==1 | pendig$digit==4 | pendig$digit == 8, ]
+
+# Order the subset by digit
+subset1 = subset1[order(subset1$digit),]
+
+# Take a random sample with 10% int he sample
+randomIndex = sample(c(T, F), size=3342, replace=T, prob=c(.1, .9))
+
+# Take the first 16 columns of a random subset of the data
+PDsubset=subset1[randomIndex, 1:16]
+
+# Grab the digit from the random subset 'subset1', not the one in the step immediately before this
+PDsubsetdigit = subset1[randomIndex,"digit"]
+
+
+PDsubsetdigit = droplevels(PDsubsetdigit) #Drops empty levels of the factor digit
+```
+
